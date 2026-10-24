@@ -1,0 +1,13 @@
+# Domain config for dentistry (Oral and Maxillofacial Pathology). Tunable without code changes.
+# Record eval results per settings version so improvements are provable.
+domain: dentistry
+
+chunking:
+  max_chars: 900
+  rule_version: v1   # bump when parsing/chunking rules change, then re-ingest
+
+retrieval:
+  top_k: 8
+  rerank: false
+  highlight_boost: 1.2
+  min_evidence_score: 0.35   # below this, abstain instead of answering

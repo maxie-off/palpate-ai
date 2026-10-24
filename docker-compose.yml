@@ -1,0 +1,39 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: palpate
+      POSTGRES_PASSWORD: palpate
+      POSTGRES_DB: palpate
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U palpate"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      PALPATE_DATABASE_URL: postgresql://palpate:palpate@db:5432/palpate
+      PALPATE_CONFIG_PATH: /config/dentistry.yaml
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./config:/config:ro
+      - ~/.aws:/root/.aws:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # frontend: added once the Next.js app exists (see frontend/README.md)
+
+volumes:
+  pgdata:

@@ -1,0 +1,2 @@
+{"question_id": "q1", "stem": "Which lesion presents as 1-3 mm white or yellow dome-shaped keratin cysts in newborns?", "gold": [{"doc": "example-notes", "page": 1}], "answerable": true}
+{"question_id": "q2", "stem": "Example of a question the knowledge base cannot answer", "gold": [], "answerable": false}
