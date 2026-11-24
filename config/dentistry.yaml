@@ -5,6 +5,11 @@ domain: dentistry
 chunking:
   max_chars: 900
   rule_version: v1   # bump when parsing/chunking rules change, then re-ingest
+  emphasis_threshold: 0.3   # share of emphasised characters that flags a chunk
+
+parsing:
+  min_color_saturation: 0.25   # coloured text (e.g. blue/red key points) counts as emphasis
+  emphasis_bold: false         # black bold is usually a heading, so off by default
 
 retrieval:
   top_k: 8

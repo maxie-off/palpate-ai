@@ -55,3 +55,6 @@ ignore_missing_imports = true
 # pymupdf ships partial type hints; allow calling its untyped constructors here.
 module = ["app.ingestion.parser"]
 disallow_untyped_calls = false
+
+[tool.ruff.lint.per-file-ignores]
+"scripts/*" = ["E501"]  # embedded HTML template

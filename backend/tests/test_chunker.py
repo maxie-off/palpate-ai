@@ -8,8 +8,9 @@ DOC = str(uuid.UUID(int=1))
 
 
 def _block(text: str, emphasised: bool = False, y: float = 700.0) -> TextBlock:
-    line = Line(text=text, bbox=(72.0, y, 300.0, y + 12), emphasised=emphasised)
-    return TextBlock(text=text, emphasised=emphasised, lines=[line])
+    emphasis = 1.0 if emphasised else 0.0
+    line = Line(text=text, bbox=(72.0, y, 300.0, y + 12), emphasis=emphasis)
+    return TextBlock(text=text, emphasis=emphasis, lines=[line])
 
 
 def _page(n: int, *blocks: tuple[str, bool]) -> PageContent:
@@ -27,7 +28,7 @@ def test_topics_split_on_upper_numeral_headings() -> None:
             ("壹、 Milia 粟丘疹", False),
             ("body one", False),
             ("貳、 Teratoma 畸胎瘤", False),
-            ("body two", True),
+            ("a long emphasised body paragraph", True),
         )
     ]
     chunks = chunk_pages(pages, DOC, "Notes", ChunkingConfig(max_chars=500))
@@ -106,3 +107,36 @@ def test_ignores_empty_blocks() -> None:
     sections = _sections(chunk_pages(pages, DOC, "N", ChunkingConfig()))
     assert len(sections) == 1
     assert sections[0].body == "text"
+
+
+def test_chunk_is_emphasised_only_above_the_character_threshold() -> None:
+    plain, stressed = "p" * 80, "s" * 20  # 20% of the characters are stressed
+    pages = [_page(1, ("壹、 T", False), (plain, False), (stressed, True))]
+    low = _sections(chunk_pages(pages, DOC, "N", ChunkingConfig(emphasis_threshold=0.3)))[0]
+    high = _sections(chunk_pages(pages, DOC, "N", ChunkingConfig(emphasis_threshold=0.1)))[0]
+    assert 0.15 < low.emphasis < 0.25
+    assert not low.emphasised and high.emphasised
+
+
+def test_page_numbers_and_header_block_are_not_chunked() -> None:
+    pages = [
+        _page(
+            1, ("- 1 -", False), ("撰寫者：林昱瑄", False), ("壹、 First", False), ("body", False)
+        )
+    ]
+    chunks = chunk_pages(pages, DOC, "N", ChunkingConfig())
+    assert [c.heading for c in chunks if c.kind == "topic"] == ["壹、 First"]
+    assert all("撰寫者" not in c.body and "- 1 -" not in c.body for c in chunks)
+
+
+def test_bare_numeral_heading_keeps_the_title_on_its_second_line() -> None:
+    block = TextBlock(
+        text="壹拾、\nTuberous sclerosis",
+        lines=[
+            Line(text="壹拾、", bbox=(0, 0, 1, 1)),
+            Line(text="Tuberous sclerosis", bbox=(0, 0, 1, 1)),
+        ],
+    )
+    pages = [PageContent(page=1, blocks=[block, _block("body")])]
+    topic = chunk_pages(pages, DOC, "N", ChunkingConfig())[0]
+    assert topic.heading == "壹拾、 Tuberous sclerosis"

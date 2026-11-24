@@ -13,12 +13,12 @@ class Line(BaseModel):
 
     text: str
     bbox: BBox
-    emphasised: bool = False
+    emphasis: float = 0.0  # share of characters the teacher stressed (colour, bold, highlight)
 
 
 class TextBlock(BaseModel):
     text: str
-    emphasised: bool = False
+    emphasis: float = 0.0
     lines: list[Line] = Field(default_factory=list)
 
 
@@ -49,7 +49,8 @@ class Chunk(BaseModel):
     breadcrumb: str = ""
     heading: str | None = None
     body: str
-    emphasised: bool = False
+    emphasis: float = 0.0  # share of emphasised characters; kept for tuning and display
+    emphasised: bool = False  # emphasis >= the configured threshold; stored and used to rank
     spans: list[ChunkSpan] = Field(default_factory=list)
 
     @property

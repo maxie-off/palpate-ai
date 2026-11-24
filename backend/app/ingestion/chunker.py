@@ -15,6 +15,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 from app.core.config import ChunkingConfig
+from app.ingestion.furniture import is_furniture
 from app.models.schemas import Chunk, ChunkSpan, PageContent
 
 _UPPER_NUMERALS = "壹貳參肆伍陸柒捌玖拾"
@@ -31,7 +32,7 @@ class _Section:
     heading: str | None
     texts: list[str] = field(default_factory=list)
     spans: list[ChunkSpan] = field(default_factory=list)
-    emphasised: bool = False
+    emphasis_chars: float = 0.0
     heading_only: bool = False
 
     @property
@@ -46,7 +47,9 @@ class _Topic:
 
 
 def _heading_text(block_text: str) -> str:
-    first = block_text.strip().splitlines()[0].strip()
+    lines = [ln.strip() for ln in block_text.strip().splitlines() if ln.strip()]
+    # A bare numeral line ("壹拾、") keeps its title, which PDFs often put on the next line.
+    first = f"{lines[0]} {lines[1]}" if lines[0].endswith("、") and len(lines) > 1 else lines[0]
     return first[:_MAX_HEADING_CHARS]
 
 
@@ -82,7 +85,7 @@ def chunk_pages(
     for page in pages:
         for block in page.blocks:
             text = block.text.strip()
-            if not text:
+            if not text or is_furniture(text):
                 continue
             if TOPIC_RE.match(text):
                 topics.append(_Topic(heading=_heading_text(text)))
@@ -100,20 +103,22 @@ def chunk_pages(
             if section is None:
                 section = new_section(None)
             section.texts.append(text)
-            section.emphasised = section.emphasised or block.emphasised
+            section.emphasis_chars += block.emphasis * len(text)
             if section.length > len(text):
                 section.heading_only = False
             section.spans.extend(ChunkSpan(page=page.page, bbox=ln.bbox) for ln in block.lines)
-    return _emit(topics, document_id, doc_title)
+    return _emit(topics, document_id, doc_title, config.emphasis_threshold)
 
 
-def _emit(topics: list[_Topic], document_id: str, doc_title: str) -> list[Chunk]:
+def _emit(topics: list[_Topic], document_id: str, doc_title: str, threshold: float) -> list[Chunk]:
     namespace = uuid.UUID(document_id)
     chunks: list[Chunk] = []
     for t_index, topic in enumerate(topics):
         sections = [s for s in topic.sections if s.texts]
         if not sections:
             continue
+        topic_chars = sum(s.length for s in sections)
+        topic_emphasis = sum(s.emphasis_chars for s in sections) / topic_chars
         topic_id = str(uuid.uuid5(namespace, f"topic:{t_index}"))
         topic_crumb = _breadcrumb(doc_title, topic.heading)
         chunks.append(
@@ -125,7 +130,8 @@ def _emit(topics: list[_Topic], document_id: str, doc_title: str) -> list[Chunk]
                 breadcrumb=topic_crumb,
                 heading=topic.heading,
                 body="\n".join("\n".join(s.texts) for s in sections),
-                emphasised=any(s.emphasised for s in sections),
+                emphasis=topic_emphasis,
+                emphasised=topic_emphasis >= threshold,
             )
         )
         for s_index, sec in enumerate(sections):
@@ -139,7 +145,8 @@ def _emit(topics: list[_Topic], document_id: str, doc_title: str) -> list[Chunk]
                     breadcrumb=_breadcrumb(doc_title, topic.heading, sec.heading),
                     heading=sec.heading,
                     body="\n".join(sec.texts),
-                    emphasised=sec.emphasised,
+                    emphasis=sec.emphasis_chars / sec.length,
+                    emphasised=sec.emphasis_chars / sec.length >= threshold,
                     spans=sec.spans,
                 )
             )

@@ -17,15 +17,24 @@ class RetrievalConfig(BaseModel):
     min_evidence_score: float = 0.35
 
 
+class ParsingConfig(BaseModel):
+    """How teacher emphasis is read from a PDF (colour and bold, besides highlights)."""
+
+    min_color_saturation: float = 0.25  # text coloured at least this much counts as emphasised
+    emphasis_bold: bool = False  # black bold is usually just a heading; opt in per domain
+
+
 class ChunkingConfig(BaseModel):
     max_chars: int = 900
     rule_version: str = "v1"
+    emphasis_threshold: float = 0.3  # share of emphasised characters that flags a chunk
 
 
 class DomainConfig(BaseModel):
     domain: str = "dentistry"
     retrieval: RetrievalConfig = Field(default_factory=RetrievalConfig)
     chunking: ChunkingConfig = Field(default_factory=ChunkingConfig)
+    parsing: ParsingConfig = Field(default_factory=ParsingConfig)
 
 
 class Settings(BaseSettings):
