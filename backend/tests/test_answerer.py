@@ -2,7 +2,7 @@ import json
 
 from app.answering.answerer import Answerer
 from app.core.config import RetrievalConfig
-from app.models.schemas import Chunk, ParsedQuestion, ScoredChunk
+from app.models.schemas import Chunk, ChunkSpan, ParsedQuestion, ScoredChunk
 
 
 class FakeLLM:
@@ -21,7 +21,12 @@ class FakeLLM:
 QUESTION = ParsedQuestion(id="q1", stem="Which lesion is Epstein-like?", options=["A", "B"])
 EVIDENCE = [
     ScoredChunk(
-        chunk=Chunk(id="d1-0000", doc_id="d1", page=3, text="Milia are 1-3 mm keratin cysts"),
+        chunk=Chunk(
+            id="c1",
+            document_id="d1",
+            spans=[ChunkSpan(page=3, bbox=(0, 0, 1, 1))],
+            body="Milia are 1-3 mm keratin cysts",
+        ),
         score=0.9,
     )
 ]
@@ -37,7 +42,7 @@ def test_answers_with_verified_citation() -> None:
         {
             "status": "answered",
             "summary": "Milia are small keratin cysts.",
-            "citations": [{"chunk_id": "d1-0000", "quote": "1-3 mm keratin cysts"}],
+            "citations": [{"chunk_id": "c1", "quote": "1-3 mm keratin cysts"}],
         }
     )
     answerer, _ = _answerer(reply)
@@ -51,7 +56,7 @@ def test_hallucinated_quote_leads_to_abstention() -> None:
         {
             "status": "answered",
             "summary": "x",
-            "citations": [{"chunk_id": "d1-0000", "quote": "invented text"}],
+            "citations": [{"chunk_id": "c1", "quote": "invented text"}],
         }
     )
     answerer, _ = _answerer(reply)

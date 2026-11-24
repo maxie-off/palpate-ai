@@ -1,8 +1,8 @@
-"""PDF parsing: text blocks per page plus a teacher-emphasis (highlight) flag.
+"""PDF parsing: text lines with positions, plus a teacher-emphasis (highlight) flag.
 
 Highlights are detected without any AI: PDF highlight annotations, and filled yellow rectangles
-(which is how Word exports highlighted text). Emphasis is flagged per text block, which is coarse
-but enough to boost ranking; finer span-level detection is a stage 2 refinement.
+(which is how Word exports highlighted text). Every line keeps its bounding box in PDF user space,
+because positions cannot be recovered later without re-parsing the original file.
 """
 
 from pathlib import Path
@@ -10,7 +10,7 @@ from typing import Any, Protocol
 
 import pymupdf
 
-from app.models.schemas import PageContent, TextBlock
+from app.models.schemas import Line, PageContent, TextBlock
 
 _MIN_OVERLAP = 0.3
 _PDF_ANNOT_HIGHLIGHT = 8  # pymupdf.PDF_ANNOT_HIGHLIGHT, which its type stubs do not export
@@ -39,11 +39,21 @@ def _highlight_rects(page: Any) -> list[Any]:
     return rects
 
 
-def _is_emphasised(block_rect: Any, highlights: list[Any]) -> bool:
-    block_area = block_rect.get_area()
-    if block_area <= 0:
+def _is_emphasised(rect: Any, highlights: list[Any]) -> bool:
+    area = rect.get_area()
+    if area <= 0:
         return False
-    return any((block_rect & hl).get_area() / block_area >= _MIN_OVERLAP for hl in highlights)
+    return any((rect & hl).get_area() / area >= _MIN_OVERLAP for hl in highlights)
+
+
+def _to_pdf_space(rect: Any, page: Any) -> tuple[float, float, float, float]:
+    """Convert a PyMuPDF rect (origin top-left, y down) to PDF user space (origin bottom-left).
+
+    Assumes the crop box starts at the origin, which holds for ordinary exported PDFs.
+    """
+    r = rect * page.derotation_matrix
+    height = page.mediabox.height
+    return (round(r.x0, 2), round(height - r.y1, 2), round(r.x1, 2), round(height - r.y0, 2))
 
 
 class PyMuPDFParser:
@@ -53,12 +63,30 @@ class PyMuPDFParser:
             for index, page in enumerate(doc, start=1):
                 highlights = _highlight_rects(page)
                 blocks: list[TextBlock] = []
-                for x0, y0, x1, y1, text, _no, block_type in page.get_text("blocks"):
-                    if block_type != 0 or not text.strip():
+                for raw in page.get_text("dict")["blocks"]:
+                    if raw["type"] != 0:
                         continue
-                    rect = pymupdf.Rect(x0, y0, x1, y1)
+                    lines: list[Line] = []
+                    for raw_line in raw["lines"]:
+                        text = "".join(s["text"] for s in raw_line["spans"]).strip()
+                        if not text:
+                            continue
+                        rect = pymupdf.Rect(raw_line["bbox"])
+                        lines.append(
+                            Line(
+                                text=text,
+                                bbox=_to_pdf_space(rect, page),
+                                emphasised=_is_emphasised(rect, highlights),
+                            )
+                        )
+                    if not lines:
+                        continue
                     blocks.append(
-                        TextBlock(text=text.strip(), emphasised=_is_emphasised(rect, highlights))
+                        TextBlock(
+                            text="\n".join(ln.text for ln in lines),
+                            emphasised=any(ln.emphasised for ln in lines),
+                            lines=lines,
+                        )
                     )
                 pages.append(PageContent(page=index, blocks=blocks))
         return pages

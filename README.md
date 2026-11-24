@@ -62,7 +62,7 @@ palpate/
 │   └── core/         settings, LLM client, DB helper
 ├── backend/tests/
 ├── config/           domain config (dentistry): chunking + retrieval settings
-├── db/init.sql       Postgres schema (pgvector)
+├── db/migrations/    Postgres schema (pgvector), see docs/schema.md
 ├── eval/             gold questions + metrics (stage 2)
 ├── data/sample/      small shareable demo data only
 ├── docs/             design notes and decision records

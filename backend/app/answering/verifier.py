@@ -29,15 +29,9 @@ def verify_citations(citations: list[Citation], chunks: Mapping[str, Chunk]) -> 
     for citation in citations:
         chunk = chunks.get(citation.chunk_id)
         quote = _normalise(citation.quote)
-        if chunk is not None and quote and quote in _normalise(chunk.text):
+        if chunk is not None and quote and quote in _normalise(chunk.body):
             valid.append(
-                citation.model_copy(
-                    update={
-                        "doc_id": chunk.doc_id,
-                        "page": chunk.page,
-                        "image_path": chunk.image_path,
-                    }
-                )
+                citation.model_copy(update={"document_id": chunk.document_id, "page": chunk.page})
             )
         else:
             dropped.append(citation)

@@ -23,7 +23,7 @@ Every quote must be copied exactly from the cited source.
 
 def build_user_prompt(question: ParsedQuestion, evidence: Sequence[ScoredChunk]) -> str:
     sources = "\n\n".join(
-        f"[{e.chunk.id}] (doc {e.chunk.doc_id}, p.{e.chunk.page})\n{e.chunk.text}" for e in evidence
+        f"[{e.chunk.id}] {e.chunk.breadcrumb} (p.{e.chunk.page})\n{e.chunk.body}" for e in evidence
     )
     options = "\n".join(f"- {o}" for o in question.options)
     return f"Sources:\n{sources}\n\nQuestion: {question.stem}\nOptions:\n{options}"

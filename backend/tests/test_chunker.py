@@ -1,13 +1,26 @@
+import uuid
+
 from app.core.config import ChunkingConfig
 from app.ingestion.chunker import chunk_pages
-from app.models.schemas import PageContent, TextBlock
+from app.models.schemas import Chunk, Line, PageContent, TextBlock
+
+DOC = str(uuid.UUID(int=1))
+
+
+def _block(text: str, emphasised: bool = False, y: float = 700.0) -> TextBlock:
+    line = Line(text=text, bbox=(72.0, y, 300.0, y + 12), emphasised=emphasised)
+    return TextBlock(text=text, emphasised=emphasised, lines=[line])
 
 
 def _page(n: int, *blocks: tuple[str, bool]) -> PageContent:
-    return PageContent(page=n, blocks=[TextBlock(text=t, emphasised=e) for t, e in blocks])
+    return PageContent(page=n, blocks=[_block(t, e) for t, e in blocks])
 
 
-def test_splits_on_chinese_numbered_headings() -> None:
+def _sections(chunks: list[Chunk]) -> list[Chunk]:
+    return [c for c in chunks if c.kind == "section"]
+
+
+def test_topics_split_on_upper_numeral_headings() -> None:
     pages = [
         _page(
             1,
@@ -17,28 +30,79 @@ def test_splits_on_chinese_numbered_headings() -> None:
             ("body two", True),
         )
     ]
-    chunks = chunk_pages(pages, "d1", ChunkingConfig(max_chars=500))
-    assert len(chunks) == 2
-    assert chunks[0].id == "d1-0000"
-    assert not chunks[0].emphasised
-    assert chunks[1].emphasised
+    chunks = chunk_pages(pages, DOC, "Notes", ChunkingConfig(max_chars=500))
+    topics = [c for c in chunks if c.kind == "topic"]
+    assert [t.heading for t in topics] == ["壹、 Milia 粟丘疹", "貳、 Teratoma 畸胎瘤"]
+    assert [t.emphasised for t in topics] == [False, True]
 
 
-def test_splits_when_size_exceeded() -> None:
-    pages = [_page(1, ("a" * 60, False), ("b" * 60, False))]
-    chunks = chunk_pages(pages, "d1", ChunkingConfig(max_chars=100))
-    assert len(chunks) == 2
+def test_sections_are_children_of_their_topic_with_breadcrumb() -> None:
+    pages = [
+        _page(
+            1,
+            ("壹、 Milia", False),
+            ("一、 病因", False),
+            ("cause text", False),
+            ("二、 臨床表現", False),
+            ("clinical text", False),
+        )
+    ]
+    chunks = chunk_pages(pages, DOC, "口病共筆", ChunkingConfig())
+    topic = chunks[0]
+    sections = _sections(chunks)
+    assert topic.kind == "topic" and topic.parent_id is None
+    assert [s.heading for s in sections] == ["一、 病因", "二、 臨床表現"]
+    assert all(s.parent_id == topic.id for s in sections)
+    assert sections[0].breadcrumb == "口病共筆 > 壹、 Milia > 一、 病因"
+    assert [s.ordinal for s in sections] == [0, 1]
+    # The topic heading stays with the first sub-section rather than becoming an empty chunk.
+    assert len(sections) == 2
+    assert "壹、 Milia" in sections[0].body
+    assert "cause text" in topic.body and "clinical text" in topic.body
 
 
-def test_chunk_records_start_page_and_rule_version() -> None:
-    pages = [_page(1, ("intro", False)), _page(2, ("貳、 next", False), ("more", False))]
-    chunks = chunk_pages(pages, "d1", ChunkingConfig(rule_version="v9"))
-    assert [c.page for c in chunks] == [1, 2]
-    assert all(c.rule_version == "v9" for c in chunks)
+def test_embed_text_prepends_breadcrumb() -> None:
+    pages = [_page(1, ("壹、 Milia", False), ("50% of newborns show lesions", False))]
+    section = _sections(chunk_pages(pages, DOC, "Notes", ChunkingConfig()))[0]
+    assert section.embed_text.startswith("Notes > 壹、 Milia\n")
+    assert "50% of newborns" in section.embed_text
+
+
+def test_splits_section_when_size_exceeded_keeping_heading() -> None:
+    pages = [_page(1, ("壹、 Topic", False), ("a" * 60, False), ("b" * 60, False))]
+    sections = _sections(chunk_pages(pages, DOC, "N", ChunkingConfig(max_chars=100)))
+    assert len(sections) == 2
+    assert {s.heading for s in sections} == {"壹、 Topic"}
+    assert [s.ordinal for s in sections] == [0, 1]
+
+
+def test_section_records_line_spans_and_start_page() -> None:
+    pages = [_page(1, ("壹、 One", False)), _page(2, ("body on page two", False))]
+    section = _sections(chunk_pages(pages, DOC, "N", ChunkingConfig()))[0]
+    assert section.page == 1
+    assert [sp.page for sp in section.spans] == [1, 2]
+    assert section.spans[0].bbox == (72.0, 700.0, 300.0, 712.0)
+
+
+def test_text_before_first_heading_gets_an_intro_topic() -> None:
+    pages = [_page(1, ("preface text", False), ("壹、 First", False), ("x", False))]
+    chunks = chunk_pages(pages, DOC, "Notes", ChunkingConfig())
+    topics = [c for c in chunks if c.kind == "topic"]
+    assert [t.heading for t in topics] == [None, "壹、 First"]
+    assert topics[0].breadcrumb == "Notes"
+
+
+def test_ids_are_deterministic_uuids() -> None:
+    pages = [_page(1, ("壹、 A", False), ("text", False))]
+    first = chunk_pages(pages, DOC, "N", ChunkingConfig())
+    second = chunk_pages(pages, DOC, "N", ChunkingConfig())
+    assert [c.id for c in first] == [c.id for c in second]
+    assert len({c.id for c in first}) == len(first)
+    uuid.UUID(first[0].id)
 
 
 def test_ignores_empty_blocks() -> None:
     pages = [_page(1, ("  ", False), ("text", False))]
-    chunks = chunk_pages(pages, "d1", ChunkingConfig())
-    assert len(chunks) == 1
-    assert chunks[0].text == "text"
+    sections = _sections(chunk_pages(pages, DOC, "N", ChunkingConfig()))
+    assert len(sections) == 1
+    assert sections[0].body == "text"
