@@ -14,7 +14,7 @@ class FakeLLM:
         self.calls += 1
         return self.reply
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
+    def embed(self, texts: list[str], *, input_type: str = "document") -> list[list[float]]:
         return [[0.0] for _ in texts]
 
 

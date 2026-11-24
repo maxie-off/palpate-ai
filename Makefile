@@ -1,4 +1,4 @@
-.PHONY: install up down lint fmt typecheck test check
+.PHONY: install up down lint fmt typecheck test test-db check
 
 install:
 	cd backend && uv sync --extra dev
@@ -20,5 +20,9 @@ typecheck:
 
 test:
 	cd backend && uv run pytest
+
+# DB-backed tests: needs `make up` (or any Postgres with db/migrations applied)
+test-db:
+	cd backend && PALPATE_TEST_DATABASE_URL=postgresql://palpate_app:palpate@localhost:5432/palpate uv run pytest
 
 check: lint typecheck test

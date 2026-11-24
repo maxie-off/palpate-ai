@@ -8,6 +8,19 @@ on:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    services:
+      db:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: palpate
+          POSTGRES_PASSWORD: palpate
+          POSTGRES_DB: palpate
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U palpate" --health-interval 5s
+          --health-timeout 3s --health-retries 10
+    env:
+      PALPATE_TEST_DATABASE_URL: postgresql://palpate_app:palpate@localhost:5432/palpate
     defaults:
       run:
         working-directory: backend
@@ -19,4 +32,7 @@ jobs:
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run mypy app
+      - name: Apply migrations
+        working-directory: .
+        run: for f in db/migrations/*.sql; do psql postgresql://palpate:palpate@localhost:5432/palpate -v ON_ERROR_STOP=1 -q -f "$f"; done
       - run: uv run pytest

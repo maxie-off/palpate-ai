@@ -1,13 +1,17 @@
 """One thin interface for every model call, so the provider can be swapped by config."""
 
 import json
-from typing import Protocol
+from typing import Literal, Protocol
+
+EmbedInput = Literal["document", "query"]
 
 
 class LLMClient(Protocol):
     def complete(self, *, system: str, user: str, model_id: str, max_tokens: int = 1024) -> str: ...
 
-    def embed(self, texts: list[str]) -> list[list[float]]: ...
+    def embed(
+        self, texts: list[str], *, input_type: EmbedInput = "document"
+    ) -> list[list[float]]: ...
 
 
 class BedrockLLMClient:
@@ -33,8 +37,8 @@ class BedrockLLMClient:
         text: str = resp["output"]["message"]["content"][0]["text"]
         return text
 
-    def embed(self, texts: list[str]) -> list[list[float]]:
-        body = json.dumps({"texts": texts, "input_type": "search_document"})
+    def embed(self, texts: list[str], *, input_type: EmbedInput = "document") -> list[list[float]]:
+        body = json.dumps({"texts": texts, "input_type": f"search_{input_type}", "truncate": "END"})
         resp = self._runtime.invoke_model(modelId=self._embedding_model_id, body=body)
         embeddings: list[list[float]] = json.loads(resp["body"].read())["embeddings"]
         return embeddings
