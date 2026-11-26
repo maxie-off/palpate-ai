@@ -14,6 +14,7 @@ dependencies = [
     "boto3>=1.35",
     "psycopg[binary]>=3.2",
     "pgvector>=0.3",
+    "langgraph>=1.0,<2",
 ]
 
 [project.optional-dependencies]
@@ -48,10 +49,10 @@ strict = true
 python_version = "3.12"
 
 [[tool.mypy.overrides]]
-module = ["pymupdf.*", "jieba.*", "boto3.*", "psycopg.*", "pgvector.*"]
+module = ["pymupdf.*", "jieba.*", "boto3.*", "psycopg.*", "pgvector.*", "langgraph.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 # pymupdf ships partial type hints; allow calling its untyped constructors here.
-module = ["app.ingestion.parser"]
+module = ["app.ingestion.parser", "app.agent.sample_pdf"]
 disallow_untyped_calls = false

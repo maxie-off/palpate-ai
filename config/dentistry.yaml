@@ -1,6 +1,7 @@
 # Domain config for dentistry (Oral and Maxillofacial Pathology). Tunable without code changes.
 # Record eval results per settings version so improvements are provable.
 domain: dentistry
+locale: zh-TW
 
 chunking:
   max_chars: 900
@@ -10,4 +11,27 @@ retrieval:
   top_k: 8
   rerank: false
   highlight_boost: 1.2
-  min_evidence_score: 0.35   # below this, abstain instead of answering
+  min_evidence_score: 0.35   # legacy Answerer only; not applied to RRF scores
+  rrf_k: 60
+  candidate_k: 50
+  min_dense_score: 0.0       # 0 keeps lexical-only hits; see docs/agent-pipeline.md
+  notes_context_k: 20
+
+notes:
+  rules_md: >
+    Write in the language of the sources. Keep technical terms in the language the source
+    uses. Every claim must quote a source span. If the sources do not cover a section,
+    leave that section empty rather than filling it from outside knowledge.
+  sections:
+    - key: overview
+      heading: Overview
+      instruction: What this lecture covered, in a short paragraph.
+    - key: key_concepts
+      heading: Key concepts
+      instruction: Named lesions, structures, and definitions the class introduced.
+    - key: clinical
+      heading: Clinical points
+      instruction: Presentation, treatment, and points the lecturer emphasised.
+    - key: figures
+      heading: Figures
+      instruction: What each figure shows. Cite the image region.

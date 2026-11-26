@@ -30,7 +30,7 @@ If your sources don't support an answer, Palpate says so instead of guessing.
                  knowledge terms)    glossary     (Bedrock)    in cited chunk
 ```
 
-It is a pipeline, not a free-roaming agent: the flow is predictable, which keeps answers verifiable. See [docs/decisions](docs/decisions).
+It is a pipeline, not a free-roaming agent: the flow is predictable, which keeps answers verifiable. Ingest, class-note drafting, and Q&A are branches of one LangGraph graph. The model writes the claims; it does not choose the steps. See [docs/agent-pipeline.md](docs/agent-pipeline.md) and [docs/decisions](docs/decisions).
 
 ## Quickstart
 
