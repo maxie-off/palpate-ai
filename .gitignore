@@ -6,6 +6,7 @@ data/private/
 data/raw/
 data/*.pdf
 data/*.pptx
+data/figures/
 
 # Python
 __pycache__/

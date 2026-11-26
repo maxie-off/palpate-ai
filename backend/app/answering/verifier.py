@@ -13,8 +13,13 @@ from dataclasses import dataclass
 from app.models.schemas import Chunk, Citation
 
 
-def _normalise(text: str) -> str:
+def normalise_text(text: str) -> str:
+    """Ignore whitespace, width, and case so PDF extraction noise does not break a match."""
     return re.sub(r"\s+", "", unicodedata.normalize("NFKC", text)).lower()
+
+
+def _normalise(text: str) -> str:
+    return normalise_text(text)
 
 
 @dataclass(frozen=True)

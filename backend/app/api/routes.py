@@ -2,12 +2,25 @@
 
 from fastapi import APIRouter, HTTPException
 
+from app.agent import run_agent
+from app.agent.types import AgentRequest, AgentResult
+
 router = APIRouter()
 
 
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@router.post("/agent/run", response_model=AgentResult)
+def agent_run(body: AgentRequest) -> AgentResult:
+    """Run one pipeline task: ingest, draft_notes, qa, quiz, or summarize.
+
+    Local paths are a stage-1 seam. The desktop client in the schema draft pushes bytes
+    through the same ingest contract; this route does not read a student's disk on its own.
+    """
+    return run_agent(body)
 
 
 @router.post("/documents")

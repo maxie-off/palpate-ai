@@ -10,11 +10,15 @@ class Retriever(Protocol):
 
 
 class PgVectorRetriever:
-    """Hybrid vector + BM25 retrieval over Postgres.
+    """Legacy entry point. The agent pipeline retrieves through ``app.agent.store``.
 
-    TODO(stage 1): vector search via pgvector.
-    TODO(stage 2): jieba BM25, highlight boost, reranking.
+    ``KnowledgeStore.search`` is hybrid dense + lexical fused with reciprocal rank
+    fusion, backed by Postgres pgvector when ``PALPATE_VECTOR_STORE=pgvector``.
+    This class remains so older call sites keep a stable import; it is not the
+    path the LangGraph workflow runs.
     """
 
     def retrieve(self, queries: list[str], top_k: int) -> list[ScoredChunk]:
-        raise NotImplementedError
+        raise NotImplementedError(
+            "Use app.agent.store.KnowledgeStore.search via the agent pipeline."
+        )
